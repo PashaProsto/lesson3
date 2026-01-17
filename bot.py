@@ -62,4 +62,49 @@ def ban_user(message):
     else:
         bot.reply_to(message, "Эта команда должна быть использована в ответ на сообщение пользователя, которого вы хотите забанить.")
 
+@bot.message_handler(func=lambda message: True)
+def check_messages(message):
+    """
+    Обрабатывает ВСЕ сообщения и банит за ссылки.
+    """
+    # Проверяем, не является ли отправитель администратором
+    user_status = bot.get_chat_member(message.chat.id, message.from_user.id).status
+    if user_status in ['administrator', 'creator']:
+        return  # Администраторов не баним
+    
+    # Проверяем текст сообщения на наличие ссылок
+    if message.text and has_link(message.text):
+        try:
+            # Баним пользователя
+            bot.ban_chat_member(message.chat.id, message.from_user.id)
+            
+            # Удаляем сообщение со ссылкой
+            bot.delete_message(message.chat.id, message.message_id)
+            
+            # Отправляем уведомление
+            warning = f"⚠️ Пользователь @{message.from_user.username} забанен за отправку ссылки!"
+            bot.send_message(message.chat.id, warning)
+            
+            # Логируем в консоль
+            print(f"[AUTO-BAN] Пользователь {message.from_user.username} (ID: {message.from_user.id}) забанен в чате {message.chat.id} за сообщение: {message.text[:50]}...")
+        except Exception as e:
+            print(f"Ошибка при бане пользователя: {e}")
+
+def has_link(text):
+    """
+    Проверяет, содержит ли текст ссылку.
+    Ищет http://, https://, www. или домены .com/.ru/.org и т.д.
+    """
+    # Паттерны для поиска ссылок
+    patterns = [
+        r'https?://\S+',           # http:// или https://
+        r'www\.\S+',               # www.
+        r'\S+\.(com|ru|org|net|xyz)\S*'  # домены
+    ]
+    
+    for pattern in patterns:
+        if re.search(pattern, text, re.IGNORECASE):
+            return True
+    return False
+
 bot.infinity_polling(none_stop=True)
